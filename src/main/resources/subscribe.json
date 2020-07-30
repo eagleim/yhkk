@@ -1,0 +1,62 @@
+{
+  "SubscribeList": {
+    "Subscribe": [{
+      "SubscribeCancelPerson": "吉林市公安局",
+      "ResourceURI": "220282000000",
+      "SubscribeCategory": "5",
+      "EndTime": "2020-07-13 18:20:00",
+      "cancelTimeStr": "2020-07-13 18:20:00",
+      "ApplicantName": "吉林市公安局",
+      "StartTime": "2019-07-13 18:20:00",
+      "Title": "怡和卡口订阅",
+      "cancelFlag": 0,
+      "Reason": "理由",
+      "SubscribeCancelOrg": "吉林市公安局",
+      "SubscribeID": "2202000000002020052915170403112",
+      "CancelReason": "取消理由",
+      "ApplicantOrg": "吉林市公安局",
+      "ReceiveAddr": "http://10.104.188.231:8361/VIID/",//记得改IP
+      "upSubscribeId": "2202000000002020052915170403112",
+      "SubscribeDetail": "51",
+      "status": 1
+    }, {
+      "SubscribeCancelPerson": "吉林市公安局",
+      "ResourceURI": "220282000000",
+      "SubscribeCategory": "3",
+      "EndTime": "2020-07-13 18:20:00",
+      "cancelTimeStr": "2020-07-13 18:20:00",
+      "ApplicantName": "吉林市公安局",
+      "StartTime": "2019-07-13 18:20:00",
+      "Title": "怡和过车信息订阅",
+      "cancelFlag": 0,
+      "Reason": "理由",
+      "SubscribeCancelOrg": "吉林市公安局",
+      "SubscribeID": "2202000000002020052915170403114",
+      "CancelReason": "取消理由",
+      "ApplicantOrg": "吉林市公安局",
+      "ReceiveAddr": "http://10.104.188.231:8361/VIID/",
+      "upSubscribeId": "2202000000002020052915170403114",
+      "SubscribeDetail": "8",
+      "status": 1
+    }, {
+      "SubscribeCancelPerson": "吉林市公安局",
+      "ResourceURI": "220282000000",
+      "SubscribeCategory": "2",
+      "EndTime": "2020-07-13 18:20:00",
+      "cancelTimeStr": "2020-07-13 18:20:00",
+      "ApplicantName": "吉林市公安局",
+      "StartTime": "2019-07-13 18:20:00",
+      "Title": "怡和设备订阅",
+      "cancelFlag": 0,
+      "Reason": "理由",
+      "SubscribeCancelOrg": "吉林市公安局",
+      "SubscribeID": "2202000000002020052915170403113",
+      "CancelReason": "取消理由",
+      "ApplicantOrg": "吉林市公安局",
+      "ReceiveAddr": "http://10.104.188.231:8361/VIID/",
+      "upSubscribeId": "2202000000002020052915170403113",
+      "SubscribeDetail": "3",
+      "status": 1
+    }]
+  }
+}
