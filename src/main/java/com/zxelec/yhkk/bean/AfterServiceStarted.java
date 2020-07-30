@@ -5,14 +5,14 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
-import com.zxelec.yhkk.utils.JsonUtil;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.ApplicationArguments;
-import org.springframework.boot.ApplicationRunner;
+import org.springframework.boot.CommandLineRunner;
+import org.springframework.core.annotation.Order;
 import org.springframework.core.io.Resource;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
@@ -29,7 +29,8 @@ import com.zxelec.yhkk.utils.JsonUtils;
  *
  */
 @Component
-public class AfterServiceStarted implements ApplicationRunner {
+@Order(1)
+public class AfterServiceStarted implements CommandLineRunner {
 
 	private Logger logger = LogManager.getLogger(AfterServiceStarted.class);
 
@@ -56,14 +57,20 @@ public class AfterServiceStarted implements ApplicationRunner {
 
 	@Value("classpath:subscribe.json")
 	private Resource jsonResource;
-
+	
+	@Autowired
+	private ThreadPoolTaskExecutor asyncServiceExecutor;
+	
 	@Override
-	public void run(ApplicationArguments args) throws Exception {
-		subscribeService.register();
-		subscribeService.keepAlive();
-		//subscribeService.subscribeAll(url, jsonResource);
-		initTollgateList();
-		initDeviceList();
+	public void run(String... args) throws Exception {
+		asyncServiceExecutor.execute(() ->{
+			logger.info("视图库1400");
+			subscribeService.register();
+			subscribeService.keepAlive();
+			//subscribeService.subscribeAll(url, jsonResource);
+			initTollgateList();
+			initDeviceList();
+		}) ;
 	}
 
 

@@ -7,9 +7,6 @@ import com.zxelec.yhkk.entity.*;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.scheduling.annotation.Async;
-import org.springframework.scheduling.annotation.EnableScheduling;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import com.alibaba.fastjson.JSONObject;
@@ -23,33 +20,15 @@ import com.zxelec.yhkk.entity.rest.VcTollgateRsp;
 import com.zxelec.yhkk.utils.JsonUtils;
 
 @Service
-@EnableScheduling
 public class ReceiveService {
 
 	@Autowired
 	private BasicsCache basicsCache;
 
 	@Autowired
-	private CarService carService;
-
-	@Autowired
-	private Queue vehiclePackageQueue;
+	private YhkkQueueService yhkkQueueService;
 
 	private Logger logger = LogManager.getLogger(ReceiveService.class);
-
-	/**
-	 * 将接收到的数据写进内存队列
-	 * @param list
-	 */
-	public void InQueue(List<Map<String, ?>> list){
-		this.vehiclePackageQueue.offer(list);
-	}
-
-	@Scheduled(cron = "${yhkk.outqueue.cron}")
-	private void OutQueue(){
-		//List<Map<String, ?>> list = this.vehiclePackageQueue.poll();
-		//writerJsonFile(list);
-	}
 
 
 	/**
@@ -106,9 +85,10 @@ public class ReceiveService {
 				}
 			} else if (map.containsKey("MotorVehicleObjectList")) {
 				CarPushReq carEntity = JSONObject.parseObject(JSONObject.toJSONString(map), CarPushReq.class);
-				logger.fatal(JSONObject.toJSONString(map));
+//				logger.fatal(JSONObject.toJSONString(map));
 				logger.info("过车记录开始传出，一共有"+carEntity.getMotorVehicleObjectList().size()+"条");
-				carService.receiveMotionVehicleData(carEntity);// 调用其他人方法发送给kafka
+				yhkkQueueService.putQueue(carEntity);
+//				carService.receiveMotionVehicleData(carEntity);// 调用其他人方法发送给kafka
 				logger.info("过车记录传出完成");
 			}
 		}

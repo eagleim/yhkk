@@ -8,16 +8,23 @@ import com.zxelec.yhkk.entity.vc.VcSubImageInfoObject;
 import com.zxelec.yhkk.entity.vc.VcSubImageList;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.PropertySource;
+import org.springframework.stereotype.Service;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
+import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLConnection;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
+import java.util.Map.Entry;
 import java.util.UUID;
 
 /**
@@ -25,10 +32,41 @@ import java.util.UUID;
  * @create: 2019-07-12 10:25
  * 过车记录转数据结构
  **/
+
 public class CarpassPush2 {
 
+	private static int yhconnTimeout = 2000;
+	
+	private static int yhreadTimeout = 2000;
+	
+//	@Value("${yhkk.img.url.ip1}")
+//	private String yhkkImgIP1;
+//	@Value("${yhkk.img.url.ip2}")
+//	private String yhkkImgIP2;
+//	@Value("${yhkk.img.url.ip3}")
+//	private String yhkkImgIP3;
+//	@Value("${yhkk.img.url.ip4}")
+//	private String yhkkImgIP4;
+//	@Value("${yhkk.img.url.ip5}")
+//	private String yhkkImgIP5;
+//	@Value("${yhkk.img.url.ip6}")
+//	private String yhkkImgIP6;
+//	@Value("${yhkk.img.url.map1}")
+//	private String yhkkImgMAP1;
+//	@Value("${yhkk.img.url.map2}")
+//	private String yhkkImgMAP2;
+//	@Value("${yhkk.img.url.map3}")
+//	private String yhkkImgMAP3;
+//	@Value("${yhkk.img.url.map4}")
+//	private String yhkkImgMAP4;
+//	@Value("${yhkk.img.url.map5}")
+//	private String yhkkImgMAP5;
+//	@Value("${yhkk.img.url.map6}")
+//	private String yhkkImgMAP6;	
+	
 
-    private static Logger logger= LogManager.getLogger(CarpassPush2.class);
+	private static Logger logger= LogManager.getLogger(CarpassPush2.class);
+    
     /**
      * 转kafka数据结构
      * @param carpass
@@ -154,85 +192,157 @@ public class CarpassPush2 {
             VcSubImageList subImageList=new VcSubImageList();
             List<VcSubImageInfoObject> subImageInfoList = new ArrayList<>();
             VcSubImageInfoObject subImageInfoObject = new VcSubImageInfoObject();
+            //HttpURLConnection httpConn = null;
+            String strUrl = "";
+        	
             if (carpass.getStorageUrl1()!=null&&carpass.getStorageUrl1().length()>1) {
                 try {
-                    URL url = new URL(carpass.getStorageUrl1());
-                    URLConnection connection = url.openConnection();
-                    connection.setDoOutput(true);
-                    BufferedImage image = ImageIO.read(connection.getInputStream());
-                    subImageInfoObject.setData(HttpUtil.URLtoImageBase64(carpass.getStorageUrl1()));
+                	strUrl = carpass.getStorageUrl1();
+
+            		if(strUrl.contains("192.169.1.10")) {
+            			strUrl = strUrl.replace("192.169.1.10", "192.168.100.171:8081");
+            		}
+            		
+            		if(strUrl.contains("192.169.1.21")) {
+            			strUrl = strUrl.replace("192.169.1.21", "192.168.100.171:8082");
+            		}
+            		
+            		if(strUrl.contains("192.169.1.208")) {
+            			strUrl = strUrl.replace("192.169.1.208", "192.168.100.171:8083");
+            		}
+                	
+            		strUrl = strUrl.replaceAll("\\\\","/");
+                	
+                    //URL url = new URL(strUrl);
+                    //httpConn = (HttpURLConnection)url.openConnection();
+                    //httpConn.setDoOutput(true);
+                    //httpConn.setConnectTimeout(yhconnTimeout);
+                    //httpConn.setReadTimeout(yhreadTimeout);
+                    //BufferedImage image = ImageIO.read(httpConn.getInputStream());
+                    String strBase64img = HttpUtil.URLtoImageBase64(strUrl);
+                    if(strBase64img==null) {
+                    	return null;
+                    }
+                    if(strBase64img.equals("0")) {
+                    	return null;
+                    }
+                    subImageInfoObject.setData(strBase64img);
                     subImageInfoObject.setDeviceID(motorVehicle.getDeviceID());
-                    subImageInfoObject.setImageID("1");
-                    subImageInfoObject.setHeight(image.getHeight());
-                    subImageInfoObject.setWidth(image.getWidth());
+                    subImageInfoObject.setImageID(UUID.randomUUID().toString());
+                    subImageInfoObject.setHeight(0);
+                    subImageInfoObject.setWidth(0);
                     subImageInfoObject.setFileFormat(carpass.getStorageUrl1().substring(carpass.getStorageUrl1().length()-4));
                     subImageInfoObject.setShotTime(carpass.getPassTime());
                     subImageInfoObject.setEventSort(motorVehicle.getInfoKind());
                     subImageInfoObject.setType("14");
                     subImageInfoList.add(subImageInfoObject);
-                }catch (MalformedURLException e){
-                    logger.error("图片 1 地址错误"+carpass.getStorageUrl1());
-                }catch (IOException e){
-                    logger.error("图片 1 下载失败"+carpass.getStorageUrl1());
+                    //httpConn.disconnect();
+                }catch (Exception e) {
+                	logger.error("图片 1 下载Exception,URL:{}, 异常信息:{}", strUrl, e);
+                	return null;
                 }
-                motorVehicle.setStorageUrl1(carpass.getStorageUrl1());
+                motorVehicle.setStorageUrl1(strUrl);
             }
             else logger.error("图片1"+carpass.getStorageUrl1()+"格式不正确");
             if (carpass.getStorageUrl2()!=null&&carpass.getStorageUrl2().length()>1){
                 try {
-                    URL url = new URL(carpass.getStorageUrl2());
-                    URLConnection connection = url.openConnection();
-                    connection.setDoOutput(true);
-                    BufferedImage image = ImageIO.read(connection.getInputStream());
-                    subImageInfoObject.setData(HttpUtil.URLtoImageBase64(carpass.getStorageUrl2()));
+                	strUrl = carpass.getStorageUrl2();
+
+            		if(strUrl.contains("192.169.1.10")) {
+            			strUrl = strUrl.replace("192.169.1.10", "192.168.100.171:8081");
+            		}
+            		
+            		if(strUrl.contains("192.169.1.21")) {
+            			strUrl = strUrl.replace("192.169.1.21", "192.168.100.171:8082");
+            		}
+            		
+            		if(strUrl.contains("192.169.1.208")) {
+            			strUrl = strUrl.replace("192.169.1.208", "192.168.100.171:8083");
+            		}
+                	
+                   String strBase64img = HttpUtil.URLtoImageBase64(strUrl);
+                    if(strBase64img.equals("0")) {
+                    	return null;
+                    }
+                    subImageInfoObject.setData(strBase64img);
                     subImageInfoObject.setDeviceID(motorVehicle.getDeviceID());
-                    subImageInfoObject.setImageID("2");
-                    subImageInfoObject.setHeight(image.getHeight());
-                    subImageInfoObject.setWidth(image.getWidth());
+                    subImageInfoObject.setImageID(UUID.randomUUID().toString());
+                    subImageInfoObject.setHeight(0);
+                    subImageInfoObject.setWidth(0);
                     subImageInfoObject.setFileFormat(carpass.getStorageUrl2().substring(carpass.getStorageUrl2().length()-4));
                     subImageInfoObject.setShotTime(carpass.getPassTime());
                     subImageInfoObject.setEventSort(motorVehicle.getInfoKind());
                     subImageInfoObject.setType("09");
                     subImageInfoList.add(subImageInfoObject);
-                }catch (MalformedURLException e){
-                    logger.error("图片 2 地址错误"+carpass.getStorageUrl2());
-                }catch (IOException e){
-                    logger.error("图片 2 下载失败"+carpass.getStorageUrl2());
+                } catch (Exception e) {
+                	logger.error("图片 2 下载Exception"+strUrl+e);
+                	return null;
                 }
-                motorVehicle.setStorageUrl2(carpass.getStorageUrl2());
+                motorVehicle.setStorageUrl2(strUrl);
             }
             if (carpass.getStorageUrl3()!=null&&carpass.getStorageUrl3().length()>1){
                 try {
-                    URL url = new URL(carpass.getStorageUrl3());
-                    URLConnection connection = url.openConnection();
-                    connection.setDoOutput(true);
-                    BufferedImage image = ImageIO.read(connection.getInputStream());
-                    subImageInfoObject.setData(HttpUtil.URLtoImageBase64(carpass.getStorageUrl3()));
+                	strUrl = carpass.getStorageUrl3();
+
+            		if(strUrl.contains("192.169.1.10")) {
+            			strUrl = strUrl.replace("192.169.1.10", "192.168.100.171:8081");
+            		}
+            		
+            		if(strUrl.contains("192.169.1.21")) {
+            			strUrl = strUrl.replace("192.169.1.21", "192.168.100.171:8082");
+            		}
+            		
+            		if(strUrl.contains("192.169.1.208")) {
+            			strUrl = strUrl.replace("192.169.1.208", "192.168.100.171:8083");
+            		}
+                	
+                    String strBase64img = HttpUtil.URLtoImageBase64(strUrl);
+                    if(strBase64img.equals("0")) {
+                    	return null;
+                    }
+                    subImageInfoObject.setData(strBase64img);
                     subImageInfoObject.setDeviceID(motorVehicle.getDeviceID());
-                    subImageInfoObject.setImageID("3");
-                    subImageInfoObject.setHeight(image.getHeight());
-                    subImageInfoObject.setWidth(image.getWidth());
+                    subImageInfoObject.setImageID(UUID.randomUUID().toString());
+                    subImageInfoObject.setHeight(0);
+                    subImageInfoObject.setWidth(0);
                     subImageInfoObject.setFileFormat(carpass.getStorageUrl3().substring(carpass.getStorageUrl3().length()-4));
                     subImageInfoObject.setShotTime(carpass.getPassTime());
                     subImageInfoObject.setEventSort(motorVehicle.getInfoKind());
                     subImageInfoObject.setType("14");
                     subImageInfoList.add(subImageInfoObject);
-                }catch (MalformedURLException e){
-                    logger.error("图片 3 地址错误"+carpass.getStorageUrl3());
-                }catch (IOException e){
-                    logger.error("图片 3 下载失败"+carpass.getStorageUrl3());
+                } catch (Exception e) {
+                	logger.error("图片 3 下载Exception"+strUrl+e);
+                	return null;
                 }
-                motorVehicle.setStorageUrl3(carpass.getStorageUrl3());
+                motorVehicle.setStorageUrl3(strUrl);
             }
             if (carpass.getStorageUrl4()!=null&&carpass.getStorageUrl4().length()<=256){
                 try {
-                    URL url = new URL(carpass.getStorageUrl4());
+                	strUrl = carpass.getStorageUrl4();
+
+            		if(strUrl.contains("192.169.1.10")) {
+            			strUrl = strUrl.replace("192.169.1.10", "192.168.100.171:8081");
+            		}
+            		
+            		if(strUrl.contains("192.169.1.21")) {
+            			strUrl = strUrl.replace("192.169.1.21", "192.168.100.171:8082");
+            		}
+            		
+            		if(strUrl.contains("192.169.1.208")) {
+            			strUrl = strUrl.replace("192.169.1.208", "192.168.100.171:8083");
+            		}
+                	
+                    URL url = new URL(strUrl);
                     URLConnection connection = url.openConnection();
                     connection.setDoOutput(true);
                     BufferedImage image = ImageIO.read(connection.getInputStream());
-                    subImageInfoObject.setData(HttpUtil.URLtoImageBase64(carpass.getStorageUrl4()));
+                    String strBase64img = HttpUtil.URLtoImageBase64(strUrl);
+                    if(strBase64img.equals("0")) {
+                    	return null;
+                    }
+                    subImageInfoObject.setData(strBase64img);
                     subImageInfoObject.setDeviceID(motorVehicle.getDeviceID());
-                    subImageInfoObject.setImageID("4");
+                    subImageInfoObject.setImageID(UUID.randomUUID().toString());
                     subImageInfoObject.setHeight(image.getHeight());
                     subImageInfoObject.setWidth(image.getWidth());
                     subImageInfoObject.setFileFormat(carpass.getStorageUrl4().substring(carpass.getStorageUrl4().length()-4));
@@ -241,21 +351,41 @@ public class CarpassPush2 {
                     subImageInfoObject.setType("100");
                     subImageInfoList.add(subImageInfoObject);
                 }catch (MalformedURLException e){
-                    logger.error("图片 4 地址错误"+carpass.getStorageUrl4());
+                    logger.error("图片 4 地址错误"+strUrl);
+                    return null;
                 }catch (IOException e){
-                    logger.error("图片 4 下载失败"+carpass.getStorageUrl4());
+                    logger.error("图片 4 下载失败"+strUrl);
+                    return null;
                 }
-                motorVehicle.setStorageUrl4(carpass.getStorageUrl4());
+                motorVehicle.setStorageUrl4(strUrl);
             }
             if (carpass.getStorageUrl5()!=null&&carpass.getStorageUrl5().length()<=256){
                 try {
-                    URL url = new URL(carpass.getStorageUrl5());
+                	strUrl = carpass.getStorageUrl5();
+
+            		if(strUrl.contains("192.169.1.10")) {
+            			strUrl = strUrl.replace("192.169.1.10", "192.168.100.171:8081");
+            		}
+            		
+            		if(strUrl.contains("192.169.1.21")) {
+            			strUrl = strUrl.replace("192.169.1.21", "192.168.100.171:8082");
+            		}
+            		
+            		if(strUrl.contains("192.169.1.208")) {
+            			strUrl = strUrl.replace("192.169.1.208", "192.168.100.171:8083");
+            		}
+                	
+                    URL url = new URL(strUrl);
                     URLConnection connection = url.openConnection();
                     connection.setDoOutput(true);
                     BufferedImage image = ImageIO.read(connection.getInputStream());
-                    subImageInfoObject.setData(HttpUtil.URLtoImageBase64(carpass.getStorageUrl5()));
+                    String strBase64img = HttpUtil.URLtoImageBase64(strUrl);
+                    if(strBase64img.equals("0")) {
+                    	return null;
+                    }
+                    subImageInfoObject.setData(strBase64img);
                     subImageInfoObject.setDeviceID(motorVehicle.getDeviceID());
-                    subImageInfoObject.setImageID("5");
+                    subImageInfoObject.setImageID(UUID.randomUUID().toString());
                     subImageInfoObject.setHeight(image.getHeight());
                     subImageInfoObject.setWidth(image.getWidth());
                     subImageInfoObject.setFileFormat(carpass.getStorageUrl5().substring(carpass.getStorageUrl5().length()-4));
@@ -264,11 +394,13 @@ public class CarpassPush2 {
                     subImageInfoObject.setType("100");
                     subImageInfoList.add(subImageInfoObject);
                 }catch (MalformedURLException e){
-                    logger.error("图片 5 地址错误"+carpass.getStorageUrl5());
+                    logger.error("图片 5 地址错误"+strUrl);
+                    return null;
                 }catch (IOException e){
-                    logger.error("图片 5 下载失败"+carpass.getStorageUrl5());
+                    logger.error("图片 5 下载失败"+strUrl);
+                    return null;
                 }
-                motorVehicle.setStorageUrl5(carpass.getStorageUrl5());
+                motorVehicle.setStorageUrl5(strUrl);
             }
             subImageList.setSubImageInfoObject(subImageInfoList);
             motorVehicle.setSubImageList(subImageList);

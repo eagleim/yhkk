@@ -3,7 +3,12 @@ package com.zxelec.yhkk.service;
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
-import com.zxelec.yhkk.entity.*;
+import com.zxelec.yhkk.entity.CarPushReq;
+import com.zxelec.yhkk.entity.CarpassPushEntity;
+import com.zxelec.yhkk.entity.MessageMetaDataType;
+import com.zxelec.yhkk.entity.MotionVehicleType;
+import com.zxelec.yhkk.entity.ViidResult;
+import com.zxelec.yhkk.entity.VissMessage;
 import com.zxelec.yhkk.entity.vc.MotorVehicle;
 import com.zxelec.yhkk.entity.vc.MotorVehicleListObject;
 import com.zxelec.yhkk.entity.vc.MotorVehicleObject;
@@ -17,7 +22,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.PropertySource;
 import org.springframework.kafka.core.KafkaTemplate;
-import org.springframework.scheduling.annotation.Async;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.stereotype.Service;
 import org.springframework.util.concurrent.ListenableFuture;
 
@@ -37,6 +42,12 @@ public class CarService {
 
     @Autowired
     private KafkaTemplate kafkaTemplate;
+    
+    @Autowired
+    private ViidQueueService viidQueueService;
+    
+    @Autowired
+    private  ThreadPoolTaskExecutor asyncServiceExecutor;
 
     private Logger logger = LogManager.getLogger(CarService.class);
     @Value("${kafka.topic}")
@@ -53,12 +64,13 @@ public class CarService {
     private String password;
     @Value("${kafka.status}")
     private Integer kafkaStatus;
-
+    @Value("${VIID.Vc.package.size}")
+    private Integer server_viidPackageSize;
     /**
      * 异步多线程逐条处理过车记录
      * @param
      */
-    @Async
+//    @Async
     public void DealWithVehicleRecord(CarpassPushEntity carpassPushEntity){
         //logger.fatal(carpassPushEntity.getDeviceID());
         /** 发送给kafka **/
@@ -68,31 +80,138 @@ public class CarService {
         }
         /** 发送到视图库 **/
         List<MotorVehicleObject> motorVehicleObjectList = new ArrayList<>();
+        long sp1 = System.currentTimeMillis();
         MotorVehicleObject motorVehicleVc = CarpassPush2.carpass2Vc(carpassPushEntity);
+        if(motorVehicleVc==null) {
+        	logger.info("motorVehicleVc==null,停止上传该条过车记录至视图库！");
+        	return;
+        }
         motorVehicleObjectList.add(motorVehicleVc);
         MotorVehicleListObject motorVehicleListObject = new MotorVehicleListObject(motorVehicleObjectList);
         MotorVehicle motorVehicle = new MotorVehicle(motorVehicleListObject);
+        long sp2 = System.currentTimeMillis();
+        logger.info("下载图片和组织报文耗时:{}",(sp2-sp1));
         sendMotionVehicle2Vc(motorVehicle);
+        long sp3 = System.currentTimeMillis();
+        logger.info("发送视图库耗时:{}",(sp3-sp2));
+    }
+    
+    /**
+     * 
+     * 异步下载图片并加入视图库上传队列
+     * 
+     * @param carpassPush
+     */    
+    public void AsyncDownloadVehiclePIC(CarpassPushEntity carpassPushEntity) {
+    	
+		long sp1 = System.currentTimeMillis();
+
+		MotorVehicleObject motorVehicleVc = CarpassPush2.carpass2Vc(carpassPushEntity);
+        if(motorVehicleVc==null) {
+        	logger.info("motorVehicleVc==null,该条过车记录未正常获取！");
+        	return;
+         }
+        viidQueueService.putQueue(motorVehicleVc);
+    	
+    	long sp2 = System.currentTimeMillis();
+        logger.info("下载图片并加入队列耗时:{}",(sp2-sp1));
+    	
+
     }
 
+    /**
+     * 异步发送过车记录到视图库
+     * 每次发送10条
+     */
+    public void AsyncSendToViid() {
+    	
+    	if (viidQueueService.size() == 0) {
+    		return;
+    	}
+    	int packageSize = 0;
+    	if (viidQueueService.size() < server_viidPackageSize) {
+    		packageSize = viidQueueService.size();	
+    	} else {
+    		packageSize = server_viidPackageSize;
+    	}
+    	
+    	long sp2 = System.currentTimeMillis();
+    	
+    	List<MotorVehicleObject> motorVehicleObjectList = new ArrayList<>();
+    	for(int j = 0; j < packageSize; j++) {
+    		MotorVehicleObject motorVehicleVc = viidQueueService.pollQueue();
+    		motorVehicleObjectList.add(motorVehicleVc);
+    	}
+    	MotorVehicleListObject motorVehicleListObject = new MotorVehicleListObject(motorVehicleObjectList);
+        MotorVehicle motorVehicle = new MotorVehicle(motorVehicleListObject);
+        
+        sendMotionVehicle2Vc(motorVehicle);
+        long sp3 = System.currentTimeMillis();
+        logger.info("发送视图库耗时:{}",(sp3-sp2));
+    }
+    
     /**
      * 接收平台数据
      *
      * @param carPushReq 数据对象
      */
     public void receiveMotionVehicleData(CarPushReq carPushReq) {
-        List<CarpassPushEntity> carpassPush = new ArrayList<>();
+        
         if (carPushReq == null) {
             logger.error("没有接收到过车记录carPushReq");
-        } else
-            carpassPush = carPushReq.getMotorVehicleObjectList();
-        if (carpassPush.isEmpty()) {
-            logger.error("carPushReq中没有过车记录carpassPush");
         } else {
+        	
+        	List<CarpassPushEntity> carpassPush = carPushReq.getMotorVehicleObjectList();
+            
+        	if (carpassPush.isEmpty()) {
+        		logger.error("carPushReq中没有过车记录carpassPush");
+        		return;
+        	}
+        	
+        	logger.info("本次从怡和接收数据包总计:{}条过车记录",(carpassPush.size()));
+
+        	/**
+        	 * 
+        	 * 原线程池异步处理方式：逐条过车记录丢给线程池处理
+        	 * 
+        	 * 2020-03-25 15：20屏蔽
+        	 * 
+        	 */
             for (CarpassPushEntity carpassPushEntity : carpassPush) {
-                DealWithVehicleRecord(carpassPushEntity);
+            	asyncServiceExecutor.execute(()->{
+            		logger.info("异步发送！！！");
+            		DealWithVehicleRecord(carpassPushEntity);
+            	});
             }
-        }
+
+
+            /**
+             * 新线程池异步处理方式：逐条过车图片下载，再将过车记录打包丢给线程池处理
+             * 
+             * 2020-03-25 15:20开启
+             * 
+             **/
+
+        	/**
+        	 * 
+        	for (CarpassPushEntity carpassPushEntity : carpassPush) {
+            	asyncServiceExecutor.execute(()->{
+            		logger.info("异步从交警服务器下载过车图片！！！");
+            		AsyncDownloadVehiclePIC(carpassPushEntity);
+            	});
+        		
+        	}
+        	
+        	asyncServiceExecutor.execute(()->{
+        		logger.info("异步发送过车记录到视图库！！！");
+        		AsyncSendToViid();
+        	});
+
+                    	 */
+
+            
+            
+        } 
     }
 
     /**
@@ -146,39 +265,15 @@ public class CarService {
      * @param motorVehicle
      */
     private void sendMotionVehicle2Vc(MotorVehicle motorVehicle) {
-        String motorVehcle = JSON.toJSONString(motorVehicle);
-        ViidResult viidResult = HttpUtil.postToVIID(VcUrl, motorVehcle, username, password);
-        if (Integer.parseInt(viidResult.getCode()) >= 500) {
-            for (int i = 0; i < 3; i++) {
-                viidResult = HttpUtil.postToVIID(VcUrl, motorVehcle, username, password);
-                if (Integer.parseInt(viidResult.getCode()) < 400) {
-                    logger.info("超时重传发送成功");
-                    break;
-                }
-            }
-        }
-        if (viidResult.getResult().startsWith("{")) {
-            JSONObject resultJson = JSON.parseObject(viidResult.getResult());
-            JSONObject responseStatusListObject = resultJson.getJSONObject("ResponseStatusListObject");
-            if (resultJson.get("ResponseStatusListObject") != null && resultJson.get("ResponseStatusListObject").toString().startsWith("{")) {
-                if (responseStatusListObject.get("ResponseStatusObject") != null && responseStatusListObject.get("ResponseStatusObject").toString().startsWith("["))
-                    ;
-                {
-                    JSONArray responseStatusObject = responseStatusListObject.getJSONArray("ResponseStatusObject");
-                    for (int i = 0; i < responseStatusObject.size(); i++) {
-                        JSONObject jsonObject = responseStatusObject.getJSONObject(i);
-                        String statusCode = jsonObject.getString("StatusCode");
-                        if (Integer.parseInt(statusCode) != 0) {
-                            logger.error("视图库发送失败：" + viidResult.getResult());
-                        }
-                    }
-                }
-            }
-        } else if (viidResult.getResult().startsWith("<")) {
-            logger.error("返回结果");
-            logger.error(viidResult.getResult());
-        }
-
+        
+		String motorVehcle = JSON.toJSONString(motorVehicle);
+		
+		if(motorVehcle.equals("")) {
+			return;
+		}
+		
+		HttpUtil.postToVIID(VcUrl, motorVehcle, username, password);
+    		
     }
 
 }

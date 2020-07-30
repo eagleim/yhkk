@@ -1,36 +1,33 @@
 package com.zxelec.yhkk.utils;
 
 import com.alibaba.fastjson.JSON;
-import com.zxelec.yhkk.entity.SubscribeRsp;
-import com.zxelec.yhkk.entity.ViidResult;
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpHost;
 import org.apache.http.HttpResponse;
+import org.apache.http.HttpStatus;
 import org.apache.http.auth.AuthScope;
 import org.apache.http.auth.UsernamePasswordCredentials;
 import org.apache.http.client.CredentialsProvider;
 import org.apache.http.client.HttpClient;
+import org.apache.http.client.config.RequestConfig;
 import org.apache.http.client.methods.HttpPost;
-import org.apache.http.client.params.ClientPNames;
 import org.apache.http.client.protocol.ClientContext;
+import org.apache.http.client.methods.CloseableHttpResponse;
+import org.apache.http.client.methods.HttpGet;
 import org.apache.http.entity.StringEntity;
 import org.apache.http.impl.client.BasicCredentialsProvider;
 import org.apache.http.impl.client.CloseableHttpClient;
-import org.apache.http.impl.client.DefaultHttpClient;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.http.protocol.BasicHttpContext;
 import org.apache.http.protocol.HttpContext;
 import org.apache.http.util.EntityUtils;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import org.springframework.util.StringUtils;
 import sun.misc.BASE64Encoder;
 
 import java.io.ByteArrayOutputStream;
-import java.io.DataInputStream;
 import java.io.IOException;
-import java.net.HttpURLConnection;
-import java.net.URL;
+import java.io.InputStream;
 
 
 public class HttpUtil {
@@ -45,48 +42,59 @@ public class HttpUtil {
      * @param password
      * @return
      */
-    public static ViidResult postToVIID(String url, String jsonString, String username, String password) {
-//        String result = "";
-//        String code = "";
-        ViidResult viidResult = new ViidResult();
-        if (!StringUtils.isEmpty(jsonString)) {
-            HttpContext httpContext = new BasicHttpContext();
-            CredentialsProvider credentialsProvider = new BasicCredentialsProvider();
-            credentialsProvider.setCredentials(AuthScope.ANY, new UsernamePasswordCredentials(username, password));
+    public static void postToVIID(String url, String jsonString, String username, String password) {
 
-            CloseableHttpClient httpClient = HttpClients.createDefault();
-            httpContext.setAttribute(ClientContext.CREDS_PROVIDER, credentialsProvider);
-//            DefaultHttpClient httpClient = new DefaultHttpClient();
-//            httpClient.getParams().setParameter(ClientPNames.ALLOW_CIRCULAR_REDIRECTS, true);
-            HttpPost httpPost = new HttpPost(url);
-            httpPost.addHeader("Content-type", "application/json");
-            try {
-                StringEntity stringEntity = new StringEntity(jsonString, "UTF-8");
-                stringEntity.setContentType("application/json");
-                httpPost.setEntity(stringEntity);
-                HttpResponse httpResponse = httpClient.execute(httpPost, httpContext);
-                viidResult.setCode(String.valueOf(httpResponse.getStatusLine().getStatusCode()));
-                if (httpResponse.getStatusLine().getStatusCode() < 400) {
-                    logger.info("发送成功");
-                }
-                HttpEntity httpEntity = httpResponse.getEntity();
-                viidResult.setResult(EntityUtils.toString(httpEntity, "utf-8"));
-            } catch (Exception e) {
-                logger.error("发送失败:" + e);
-                e.printStackTrace();
-            } finally {
-                try {
-                    httpClient.close();
-                } catch (IOException e) {
-                    logger.error("关闭失败" + e);
-                }
+        HttpContext httpContext = new BasicHttpContext();
+        CredentialsProvider credentialsProvider = new BasicCredentialsProvider();
+        credentialsProvider.setCredentials(AuthScope.ANY, new UsernamePasswordCredentials(username, password));
+
+        CloseableHttpClient httpClient = HttpClients.createDefault();
+        CloseableHttpResponse httpResponse = null;
+        
+        httpContext.setAttribute(ClientContext.CREDS_PROVIDER, credentialsProvider);
+        RequestConfig requestConfig = RequestConfig.custom()
+                .setConnectTimeout(60000).setConnectionRequestTimeout(60000)  
+                .setSocketTimeout(60000).build();
+                
+
+        HttpPost httpPost = new HttpPost(url);
+        httpPost.setConfig(requestConfig);
+        httpPost.addHeader("Content-type", "application/json");
+        try {
+            StringEntity stringEntity = new StringEntity(jsonString, "UTF-8");
+            stringEntity.setContentType("application/json");
+            httpPost.setEntity(stringEntity);
+            httpResponse = httpClient.execute(httpPost, httpContext);
+            
+            if (httpResponse.getStatusLine().getStatusCode() < 400) {
+                logger.info("发送成功, httpStatusCode:{}, ", (httpResponse.getStatusLine().getStatusCode()));
             }
-
-        } else {
-            viidResult.setResult(JSON.toJSONString(new SubscribeRsp("-1", "发送文件为空")));
-            logger.error("发送文件为空");
+            HttpEntity httpEntity = httpResponse.getEntity();
+            logger.info("视图库返回消息：" + EntityUtils.toString(httpEntity, "utf-8"));
+        } catch (Exception e) {
+            logger.error("发送失败:" + e.getMessage());
+            
+        } finally {
+            if(httpResponse != null) {
+            	try {
+					httpResponse.close();
+				} catch (IOException e) {
+					// TODO Auto-generated catch block
+					logger.error("视图库httpResponse close 异常！" + e.getMessage());
+				}
+            }
+            if(httpClient != null) {
+            	try {
+					httpClient.close();
+				} catch (IOException e) {
+					// TODO Auto-generated catch block
+					logger.error("视图库httpClient close 异常！" + e.getMessage());
+				}
+            }
+            
         }
-        return viidResult;
+
+
     }
 
     /**
@@ -96,30 +104,60 @@ public class HttpUtil {
      * @return
      */
     public static String URLtoImageBase64(String urlString) {
-        HttpURLConnection httpURLConnection = null;
-        DataInputStream dataInputStream = null;
+    	CloseableHttpClient httpClient = null;
+    	CloseableHttpResponse response = null;
+        InputStream dataInputStream = null;
         ByteArrayOutputStream byteArrayOutputStream = null;
         try {
-            URL url = new URL(urlString);
-            httpURLConnection = (HttpURLConnection) url.openConnection();
-            httpURLConnection.connect();
-            dataInputStream = new DataInputStream(httpURLConnection.getInputStream());
+            httpClient = HttpClients.createDefault();
+                        
+            RequestConfig requestConfig = RequestConfig.custom()
+                    .setConnectTimeout(3000).setConnectionRequestTimeout(3000)  
+                    .setSocketTimeout(3000).build();
+
+            HttpGet httpGet = new HttpGet(urlString);
+            httpGet.setConfig(requestConfig);
+            
+            response = httpClient.execute(httpGet);
+            if(response.getStatusLine().getStatusCode()!=HttpStatus.SC_OK) {
+            	logger.error("图片服务器响应错误，URL：{},错误代码：{}", urlString, response.getStatusLine().getStatusCode());
+            	return "0";
+            }
+            
+            HttpEntity entity = response.getEntity();
+            dataInputStream = entity.getContent();
             byteArrayOutputStream = new ByteArrayOutputStream();
             byte[] buffer = new byte[2048];
             int count = 0;
             while ((count = dataInputStream.read(buffer)) != -1) {
                 byteArrayOutputStream.write(buffer, 0, count);
             }
+            
         } catch (Exception e) {
-            logger.error("获取图片失败" + e);
+            logger.error("图片下载Exception,URL:{}, 错误码：{}", urlString, e);
+            return "0";
         } finally {
             try {
-                dataInputStream.close();
-                byteArrayOutputStream.close();
-                httpURLConnection.disconnect();
-            } catch (IOException e) {
+            	if(dataInputStream != null) {
+            		dataInputStream.close();
+            	}
+                if(byteArrayOutputStream != null) {
+                	byteArrayOutputStream.close();
+                }
+                if(response != null) {
+                	response.close();
+                }
+                if(httpClient != null) {
+                	httpClient.close();
+                }
+                
+            } catch (Exception e) {
                 logger.error("关闭流失败" + e);
             }
+        }
+        
+        if (byteArrayOutputStream == null) {
+        	return "0";
         }
         return base64Encode(byteArrayOutputStream.toByteArray());
     }

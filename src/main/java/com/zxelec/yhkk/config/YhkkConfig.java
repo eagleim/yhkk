@@ -41,6 +41,8 @@ import org.springframework.security.web.authentication.www.DigestAuthenticationF
 
 import com.zxelec.yhkk.bean.CustomProperties;
 
+
+
 /**
  * 全局扫描控制类
  * 
@@ -64,7 +66,7 @@ public class YhkkConfig  extends WebSecurityConfigurerAdapter {
 	private CustomProperties customProperties;
 
 
-	@Bean
+	@Bean("asyncServiceExecutor")
 	public ThreadPoolTaskExecutor asyncServiceExecutor() {
 		logger.debug("sta@Beanrt asyncServiceExecutor");
 		ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();

@@ -43,6 +43,7 @@ public class ReceiveController {
 
 	private Logger logger = LogManager.getLogger(ReceiveController.class);
 
+
 	/**
 	 * 接收通知信息
 	 * @param subscribeID
@@ -64,7 +65,7 @@ public class ReceiveController {
 				return new SubscribeRsp("-1", "失败【" + SubscribeID + "】有误");
 			}
 		}
-		receiveService.InQueue(list);
+		receiveService.writerJsonFile(list);
 		return new SubscribeRsp("0", "成功");
 	}
 
