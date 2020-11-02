@@ -1,31 +1,32 @@
 package com.zxelec.yhkk.utils;
 
-import com.zxelec.yhkk.entity.CarpassPushEntity;
-import com.zxelec.yhkk.entity.MotionVehicleType;
-import com.zxelec.yhkk.entity.VehiclePictureType;
-import com.zxelec.yhkk.entity.vc.MotorVehicleObject;
-import com.zxelec.yhkk.entity.vc.VcSubImageInfoObject;
-import com.zxelec.yhkk.entity.vc.VcSubImageList;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.annotation.PropertySource;
-import org.springframework.stereotype.Service;
-
-import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
-import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLConnection;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.List;
-import java.util.Map.Entry;
+import java.util.Map;
 import java.util.UUID;
+
+import javax.imageio.ImageIO;
+
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
+
+import com.zxelec.yhkk.entity.CarpassPushEntity;
+import com.zxelec.yhkk.entity.MotionVehicleType;
+import com.zxelec.yhkk.entity.VehiclePictureType;
+import com.zxelec.yhkk.entity.vc.MotorVehicleObject;
+import com.zxelec.yhkk.entity.vc.VcSubImageInfoObject;
+import com.zxelec.yhkk.entity.vc.VcSubImageList;
+import com.zxelec.yhkk.jpa.TImgErrorMsgJpa;
+import com.zxelec.yhkk.service.CarpassPushService;
 
 /**
  * @author: dily
@@ -33,6 +34,7 @@ import java.util.UUID;
  * 过车记录转数据结构
  **/
 
+@Component
 public class CarpassPush2 {
 
 	private static int yhconnTimeout = 2000;
@@ -66,6 +68,9 @@ public class CarpassPush2 {
 	
 
 	private static Logger logger= LogManager.getLogger(CarpassPush2.class);
+
+	@Autowired
+	private CarpassPushService carpassPushService;
     
     /**
      * 转kafka数据结构
@@ -162,7 +167,7 @@ public class CarpassPush2 {
      * @param carpass
      * @return
      */
-    public static MotorVehicleObject carpass2Vc(CarpassPushEntity carpass){
+    public  MotorVehicleObject carpass2Vc(CarpassPushEntity carpass){
         MotorVehicleObject motorVehicle = new MotorVehicleObject();
         if (carpass!=null){
             /** 过车记录ID **/
@@ -219,11 +224,14 @@ public class CarpassPush2 {
                     //httpConn.setConnectTimeout(yhconnTimeout);
                     //httpConn.setReadTimeout(yhreadTimeout);
                     //BufferedImage image = ImageIO.read(httpConn.getInputStream());
-                    String strBase64img = HttpUtil.URLtoImageBase64(strUrl);
-                    if(strBase64img==null) {
-                    	return null;
-                    }
+            		Map<String,Object> param = new HashMap<>();
+                    String strBase64img = HttpUtil.URLtoImageBase64(strUrl,param);
                     if(strBase64img.equals("0")) {
+                    	logger.info("访问图片异常:statusCode:{},errMessage",
+                    			param.get("statusCode"),param.get("errMessage"));
+                    	param.put("motorVehicleId",motorVehicle.getMotorVehicleID());
+                    	param.put("imgUrl", strUrl);
+                    	carpassPushService.insTimgErrorMsg(param);
                     	return null;
                     }
                     subImageInfoObject.setData(strBase64img);
@@ -238,7 +246,7 @@ public class CarpassPush2 {
                     subImageInfoList.add(subImageInfoObject);
                     //httpConn.disconnect();
                 }catch (Exception e) {
-                	logger.error("图片 1 下载Exception,URL:{}, 异常信息:{}", strUrl, e);
+                	logger.error("图片 1 下载Exception,URL:{}, 异常信息:{}", strUrl,e.getMessage(),e);
                 	return null;
                 }
                 motorVehicle.setStorageUrl1(strUrl);
@@ -259,9 +267,14 @@ public class CarpassPush2 {
             		if(strUrl.contains("192.169.1.208")) {
             			strUrl = strUrl.replace("192.169.1.208", "192.168.100.171:8083");
             		}
-                	
-                   String strBase64img = HttpUtil.URLtoImageBase64(strUrl);
+            		Map<String,Object> param = new HashMap<>();
+                   String strBase64img = HttpUtil.URLtoImageBase64(strUrl,param);
                     if(strBase64img.equals("0")) {
+                    	logger.info("访问图片异常:statusCode:{},errMessage",
+                    			param.get("statusCode"),param.get("errMessage"));
+                    	param.put("motorVehicleId",motorVehicle.getMotorVehicleID());
+                    	param.put("imgUrl", strUrl);
+                    	carpassPushService.insTimgErrorMsg(param);
                     	return null;
                     }
                     subImageInfoObject.setData(strBase64img);
@@ -295,9 +308,14 @@ public class CarpassPush2 {
             		if(strUrl.contains("192.169.1.208")) {
             			strUrl = strUrl.replace("192.169.1.208", "192.168.100.171:8083");
             		}
-                	
-                    String strBase64img = HttpUtil.URLtoImageBase64(strUrl);
+                	Map<String,Object> param = new HashMap<>();
+                    String strBase64img = HttpUtil.URLtoImageBase64(strUrl,param);
                     if(strBase64img.equals("0")) {
+                    	logger.info("访问图片异常:statusCode:{},errMessage",
+                    			param.get("statusCode"),param.get("errMessage"));
+                    	param.put("motorVehicleId",motorVehicle.getMotorVehicleID());
+                    	param.put("imgUrl", strUrl);
+                    	carpassPushService.insTimgErrorMsg(param);
                     	return null;
                     }
                     subImageInfoObject.setData(strBase64img);
@@ -332,14 +350,21 @@ public class CarpassPush2 {
             			strUrl = strUrl.replace("192.169.1.208", "192.168.100.171:8083");
             		}
                 	
+                   
+                    Map<String,Object> param = new HashMap<>();
+                    String strBase64img = HttpUtil.URLtoImageBase64(strUrl,param);
+                    if(strBase64img.equals("0")) {
+                    	logger.info("访问图片异常:statusCode:{},errMessage",
+                    			param.get("statusCode"),param.get("errMessage"));
+                    	param.put("motorVehicleId",motorVehicle.getMotorVehicleID());
+                    	param.put("imgUrl", strUrl);
+                    	carpassPushService.insTimgErrorMsg(param);
+                    	return null;
+                    }
                     URL url = new URL(strUrl);
                     URLConnection connection = url.openConnection();
                     connection.setDoOutput(true);
                     BufferedImage image = ImageIO.read(connection.getInputStream());
-                    String strBase64img = HttpUtil.URLtoImageBase64(strUrl);
-                    if(strBase64img.equals("0")) {
-                    	return null;
-                    }
                     subImageInfoObject.setData(strBase64img);
                     subImageInfoObject.setDeviceID(motorVehicle.getDeviceID());
                     subImageInfoObject.setImageID(UUID.randomUUID().toString());
@@ -375,17 +400,23 @@ public class CarpassPush2 {
             			strUrl = strUrl.replace("192.169.1.208", "192.168.100.171:8083");
             		}
                 	
-                    URL url = new URL(strUrl);
-                    URLConnection connection = url.openConnection();
-                    connection.setDoOutput(true);
-                    BufferedImage image = ImageIO.read(connection.getInputStream());
-                    String strBase64img = HttpUtil.URLtoImageBase64(strUrl);
+                    Map<String,Object> param = new HashMap<>();
+                    String strBase64img = HttpUtil.URLtoImageBase64(strUrl,param);
                     if(strBase64img.equals("0")) {
+                    	logger.info("访问图片异常:statusCode:{},errMessage",
+                    			param.get("statusCode"),param.get("errMessage"));
+                    	param.put("motorVehicleId",motorVehicle.getMotorVehicleID());
+                    	param.put("imgUrl", strUrl);
+                    	carpassPushService.insTimgErrorMsg(param);
                     	return null;
                     }
                     subImageInfoObject.setData(strBase64img);
                     subImageInfoObject.setDeviceID(motorVehicle.getDeviceID());
                     subImageInfoObject.setImageID(UUID.randomUUID().toString());
+                    URL url = new URL(strUrl);
+                    URLConnection connection = url.openConnection();
+                    connection.setDoOutput(true);
+                    BufferedImage image = ImageIO.read(connection.getInputStream());
                     subImageInfoObject.setHeight(image.getHeight());
                     subImageInfoObject.setWidth(image.getWidth());
                     subImageInfoObject.setFileFormat(carpass.getStorageUrl5().substring(carpass.getStorageUrl5().length()-4));
@@ -399,7 +430,9 @@ public class CarpassPush2 {
                 }catch (IOException e){
                     logger.error("图片 5 下载失败"+strUrl);
                     return null;
-                }
+                }finally {
+					
+				}
                 motorVehicle.setStorageUrl5(strUrl);
             }
             subImageList.setSubImageInfoObject(subImageInfoList);

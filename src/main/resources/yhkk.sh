@@ -24,7 +24,7 @@ nofork=""
 cd `dirname $0`
 yhkk_HOME=`pwd`
 
-jarfile="yhkk-0.0.0.1.jar"
+jarfile="yhkk-0.0.0.2.jar"
 
 jpdaOptions="-agentlib:jdwp=transport=dt_socket,address=$jpdaPort,server=y,suspend=n"
 

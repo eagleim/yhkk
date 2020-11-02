@@ -1,19 +1,20 @@
 package com.zxelec.yhkk.utils;
 
-import com.alibaba.fastjson.JSON;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.Map;
+
 import org.apache.http.HttpEntity;
-import org.apache.http.HttpHost;
-import org.apache.http.HttpResponse;
 import org.apache.http.HttpStatus;
 import org.apache.http.auth.AuthScope;
 import org.apache.http.auth.UsernamePasswordCredentials;
 import org.apache.http.client.CredentialsProvider;
-import org.apache.http.client.HttpClient;
 import org.apache.http.client.config.RequestConfig;
-import org.apache.http.client.methods.HttpPost;
-import org.apache.http.client.protocol.ClientContext;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpGet;
+import org.apache.http.client.methods.HttpPost;
+import org.apache.http.client.protocol.ClientContext;
 import org.apache.http.entity.StringEntity;
 import org.apache.http.impl.client.BasicCredentialsProvider;
 import org.apache.http.impl.client.CloseableHttpClient;
@@ -23,12 +24,8 @@ import org.apache.http.protocol.HttpContext;
 import org.apache.http.util.EntityUtils;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+
 import sun.misc.BASE64Encoder;
-
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-
 
 public class HttpUtil {
     private static Logger logger = LogManager.getLogger(HttpUtil.class);
@@ -101,9 +98,10 @@ public class HttpUtil {
      * 根据url获取图片转byte64
      *
      * @param urlString
+     * @param param key【statusCode,errMessage】 
      * @return
      */
-    public static String URLtoImageBase64(String urlString) {
+    public static String URLtoImageBase64(String urlString,Map<String,Object> param){
     	CloseableHttpClient httpClient = null;
     	CloseableHttpResponse response = null;
         InputStream dataInputStream = null;
@@ -121,6 +119,8 @@ public class HttpUtil {
             response = httpClient.execute(httpGet);
             if(response.getStatusLine().getStatusCode()!=HttpStatus.SC_OK) {
             	logger.error("图片服务器响应错误，URL：{},错误代码：{}", urlString, response.getStatusLine().getStatusCode());
+            	param.put("statusCode", response.getStatusLine().getStatusCode());
+            	param.put("errMessage", "请求URL失败："+response.getStatusLine().getReasonPhrase());
             	return "0";
             }
             
@@ -135,6 +135,8 @@ public class HttpUtil {
             
         } catch (Exception e) {
             logger.error("图片下载Exception,URL:{}, 错误码：{}", urlString, e);
+            param.put("statusCode",444);
+            param.put("errMessage", e.toString());
             return "0";
         } finally {
             try {
@@ -157,6 +159,8 @@ public class HttpUtil {
         }
         
         if (byteArrayOutputStream == null) {
+        	param.put("statusCode", "444");
+        	param.put("errMessage", "下载图片未知异常");
         	return "0";
         }
         return base64Encode(byteArrayOutputStream.toByteArray());

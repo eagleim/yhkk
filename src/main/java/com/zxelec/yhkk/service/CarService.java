@@ -66,6 +66,14 @@ public class CarService {
     private Integer kafkaStatus;
     @Value("${VIID.Vc.package.size}")
     private Integer server_viidPackageSize;
+    
+    @Autowired
+    private CarpassPush2 carpassPush2;
+    
+	
+	@Autowired
+	private CarpassPushService carpassPushService;
+    
     /**
      * 异步多线程逐条处理过车记录
      * @param
@@ -81,9 +89,10 @@ public class CarService {
         /** 发送到视图库 **/
         List<MotorVehicleObject> motorVehicleObjectList = new ArrayList<>();
         long sp1 = System.currentTimeMillis();
-        MotorVehicleObject motorVehicleVc = CarpassPush2.carpass2Vc(carpassPushEntity);
+        MotorVehicleObject motorVehicleVc = carpassPush2.carpass2Vc(carpassPushEntity);
         if(motorVehicleVc==null) {
-        	logger.info("motorVehicleVc==null,停止上传该条过车记录至视图库！");
+        	logger.info("motorVehicleVc==null,停止上传该条过车记录至视图库，并写入DB！");
+        	carpassPushService.insMotionVehicle(carpassPushEntity);
         	return;
         }
         motorVehicleObjectList.add(motorVehicleVc);
@@ -106,9 +115,10 @@ public class CarService {
     	
 		long sp1 = System.currentTimeMillis();
 
-		MotorVehicleObject motorVehicleVc = CarpassPush2.carpass2Vc(carpassPushEntity);
+		MotorVehicleObject motorVehicleVc = carpassPush2.carpass2Vc(carpassPushEntity);
         if(motorVehicleVc==null) {
-        	logger.info("motorVehicleVc==null,该条过车记录未正常获取！");
+        	logger.info("motorVehicleVc==null,停止上传该条过车记录至视图库，并写入DB！");
+        	carpassPushService.insMotionVehicle(carpassPushEntity);
         	return;
          }
         viidQueueService.putQueue(motorVehicleVc);
